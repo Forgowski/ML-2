@@ -160,12 +160,21 @@ def assign_rfm_score(series, reversed=False):
     labels = [0, 1, 2, 3, 4, 5]
     if reversed:
         labels = labels[::-1]
-        
+
     return pd.cut(series,
                   bins=[-np.inf, series.quantile(0.166), series.quantile(0.333), series.quantile(0.5),
                         series.quantile(0.666), series.quantile(0.833), np.inf],
                   labels=labels)
 
+def segment_customer(rfm_score):
+    if rfm_score >= 12:
+        return 'Best customer'
+    elif rfm_score >= 9:
+        return 'Loyal'
+    elif rfm_score >= 6:
+        return 'Occasional'
+    else:
+        return 'At Risk'
 
 def new_df_for_rfm(df):
     df['InvoiceDate'] = pd.to_datetime(df['InvoiceDate'])
@@ -185,12 +194,16 @@ def new_df_for_rfm(df):
         'monetary': monetary
     })
 
-    rfm.to_csv("rfm.csv")
-
-    rfm['R_score'] = assign_rfm_score(rfm['recency'])
+    rfm['R_score'] = assign_rfm_score(rfm['recency'], reversed=True)
 
     rfm['F_score'] = assign_rfm_score(rfm['frequency'])
 
     rfm['M_score'] = assign_rfm_score(rfm['monetary'])
 
     rfm['RFM_score'] = rfm['R_score'].astype(int) + rfm['F_score'].astype(int) + rfm['M_score'].astype(int)
+
+    rfm['Segment'] = rfm['RFM_score'].apply(segment_customer)
+
+    rfm.to_csv("rfm.csv")
+
+
