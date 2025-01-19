@@ -1,6 +1,8 @@
 import pandas as pd
 from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans, DBSCAN
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
 from sklearn.preprocessing import StandardScaler
 import seaborn as sns
 
@@ -19,9 +21,8 @@ def find_and_delete_nulls(df):
 
     return df
 
-def find_and_delete_nagative_quantity(df):
+def find_nagative_quantity(df):
     negative_values = df['Quantity'] < 0
-    df = df[~negative_values]
     print(f"liczba anomali: {df[negative_values].shape[0]}")
 
     return df
@@ -53,10 +54,10 @@ def prepare_and_execute_clustering(df):
     scaler = StandardScaler()
     data_scaled = scaler.fit_transform(df)
 
-    kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
+    kmeans = KMeans(n_clusters=5, random_state=42, n_init=10)
     df['Cluster_KMeans'] = kmeans.fit_predict(data_scaled)
 
-    dbscan = DBSCAN(eps=0.5, min_samples=5)
+    dbscan = DBSCAN(eps=0.2, min_samples=15)
     df['Cluster_DBSCAN'] = dbscan.fit_predict(data_scaled)
 
     plt.figure(figsize=(12, 6))
@@ -81,3 +82,87 @@ def prepare_and_execute_clustering(df):
     describe_cluster_group(df, "Cluster_KMeans")
     describe_cluster_group(df, "Cluster_DBSCAN")
 
+    return df
+
+def tsne(df):
+
+    tsne_df = df[['TotalOrderValue', 'AverageOrderValue', 'Quantity']]
+
+    tsne = TSNE(n_components=2, random_state=42, perplexity=30, n_iter=500)
+    tsne_result = tsne.fit_transform(tsne_df)
+
+
+    tsne_data_with_clusters = pd.DataFrame(tsne_result, columns=['Dimension 1', 'Dimension 2'])
+    tsne_data_with_clusters['Cluster_KMeans'] = df['Cluster_KMeans'].values
+    tsne_data_with_clusters['Cluster_DBSCAN'] = df['Cluster_DBSCAN'].values
+
+    plt.figure(figsize=(10, 6))
+    for cluster_id in tsne_data_with_clusters['Cluster_KMeans'].unique():
+        cluster_points = tsne_data_with_clusters[tsne_data_with_clusters['Cluster_KMeans'] == cluster_id]
+        plt.scatter(cluster_points['Dimension 1'], cluster_points['Dimension 2'], label=f'Cluster {cluster_id}',
+                    alpha=0.7)
+    plt.title('t-SNE Visualization with K-Means Clusters', fontsize=14)
+    plt.xlabel('t-SNE Dimension 1')
+    plt.ylabel('t-SNE Dimension 2')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+    plt.figure(figsize=(10, 6))
+    for cluster_id in tsne_data_with_clusters['Cluster_DBSCAN'].unique():
+        cluster_points = tsne_data_with_clusters[tsne_data_with_clusters['Cluster_DBSCAN'] == cluster_id]
+        plt.scatter(cluster_points['Dimension 1'], cluster_points['Dimension 2'], label=f'Cluster {cluster_id}',
+                    alpha=0.7)
+    plt.title('t-SNE Visualization with DBSCAN Clusters', fontsize=14)
+    plt.xlabel('t-SNE Dimension 1')
+    plt.ylabel('t-SNE Dimension 2')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+    cluster_means = df.groupby('Cluster_DBSCAN')[['TotalOrderValue', 'AverageOrderValue', 'Quantity']].mean()
+    print(cluster_means)
+
+    cluster_means = df.groupby('Cluster_KMeans')[['TotalOrderValue', 'AverageOrderValue', 'Quantity']].mean()
+    print(cluster_means)
+
+    return df
+
+def group_with_the_biggest_amount_of_returns(df):
+    returns = df[df['Quantity'] < 0]
+
+    dbscan_returns = returns.groupby('Cluster_DBSCAN')['Quantity'].sum()
+    print("Sumaryczna wartość zwrotów w grupach DBSCAN:")
+    print(dbscan_returns)
+
+    kmeans_returns = returns.groupby('Cluster_KMeans')['Quantity'].sum()
+    print("\nSumaryczna wartość zwrotów w grupach KMeans:")
+    print(kmeans_returns)
+
+    max_dbscan_cluster = dbscan_returns.idxmin()
+    max_kmeans_cluster = kmeans_returns.idxmin()
+
+    print(
+        f"\nGrupa DBSCAN z największą sumaryczną wartością zwrotów: {max_dbscan_cluster} ({dbscan_returns[max_dbscan_cluster]} jednostek zwróconych)")
+    print(
+        f"Grupa KMeans z największą sumaryczną wartością zwrotów: {max_kmeans_cluster} ({kmeans_returns[max_kmeans_cluster]} jednostek zwróconych)")
+
+def new_df_for_rfm(df):
+    df['InvoiceDate'] = pd.to_datetime(df['InvoiceDate'])
+
+    reference_date = pd.to_datetime('2011-12-31')
+
+    recency = df.groupby('CustomerID')['InvoiceDate'].max()
+    recency = (reference_date - recency).dt.days
+
+    frequency = df.groupby('CustomerID')['InvoiceDate'].count()
+
+    monetary = df.groupby('CustomerID')['TotalOrderValue'].sum()
+
+    rfm = pd.DataFrame({
+        'recency': recency,
+        'frequency': frequency,
+        'monetary': monetary
+    })
+
+    rfm.to_csv("rfm.csv")
