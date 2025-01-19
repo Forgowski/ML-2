@@ -36,6 +36,17 @@ def create_totalordervalue_and_averageordervalue(df):
     print(df)
     return df
 
+def describe_cluster_group(df, cluster):
+    summary = df.groupby(cluster).agg({
+        'TotalOrderValue': ['mean', 'median', 'std', 'min', 'max'],
+        'AverageOrderValue': ['mean', 'median', 'std', 'min', 'max'],
+        'Quantity': ['mean', 'median', 'std', 'min', 'max']
+    })
+
+    print(f"Podsumowanie statystyk dla {cluster}:")
+    print(summary)
+    summary.to_csv(f'{cluster}.csv', index=False)
+
 def prepare_and_execute_clustering(df):
     df = df[['TotalOrderValue', 'AverageOrderValue', 'Quantity']]
 
@@ -66,3 +77,7 @@ def prepare_and_execute_clustering(df):
     plt.show()
 
     df.to_csv('klastry.csv', index=False)
+
+    describe_cluster_group(df, "Cluster_KMeans")
+    describe_cluster_group(df, "Cluster_DBSCAN")
+
