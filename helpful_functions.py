@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans, DBSCAN
@@ -6,9 +7,11 @@ from sklearn.manifold import TSNE
 from sklearn.preprocessing import StandardScaler
 import seaborn as sns
 
+
 def load_data(path):
     df = pd.read_csv(path)
     return df
+
 
 def find_and_delete_nulls(df):
     print("Brakujące dane przed usunięciem:")
@@ -21,21 +24,25 @@ def find_and_delete_nulls(df):
 
     return df
 
+
 def find_nagative_quantity(df):
     negative_values = df['Quantity'] < 0
     print(f"liczba anomali: {df[negative_values].shape[0]}")
 
     return df
 
+
 def show_basic_stats(df):
     print(df.describe())
     print(f"Mediana ilosci: {df['Quantity'].median()}")
+
 
 def create_totalordervalue_and_averageordervalue(df):
     df['TotalOrderValue'] = df['Quantity'] * df['UnitPrice']
     df['AverageOrderValue'] = df.groupby('StockCode')['TotalOrderValue'].transform('mean')
     print(df)
     return df
+
 
 def describe_cluster_group(df, cluster):
     summary = df.groupby(cluster).agg({
@@ -47,6 +54,7 @@ def describe_cluster_group(df, cluster):
     print(f"Podsumowanie statystyk dla {cluster}:")
     print(summary)
     summary.to_csv(f'{cluster}.csv', index=False)
+
 
 def prepare_and_execute_clustering(df):
     df = df[['TotalOrderValue', 'AverageOrderValue', 'Quantity']]
@@ -84,13 +92,12 @@ def prepare_and_execute_clustering(df):
 
     return df
 
-def tsne(df):
 
+def tsne(df):
     tsne_df = df[['TotalOrderValue', 'AverageOrderValue', 'Quantity']]
 
     tsne = TSNE(n_components=2, random_state=42, perplexity=30, n_iter=500)
     tsne_result = tsne.fit_transform(tsne_df)
-
 
     tsne_data_with_clusters = pd.DataFrame(tsne_result, columns=['Dimension 1', 'Dimension 2'])
     tsne_data_with_clusters['Cluster_KMeans'] = df['Cluster_KMeans'].values
@@ -128,6 +135,7 @@ def tsne(df):
 
     return df
 
+
 def group_with_the_biggest_amount_of_returns(df):
     returns = df[df['Quantity'] < 0]
 
@@ -146,6 +154,18 @@ def group_with_the_biggest_amount_of_returns(df):
         f"\nGrupa DBSCAN z największą sumaryczną wartością zwrotów: {max_dbscan_cluster} ({dbscan_returns[max_dbscan_cluster]} jednostek zwróconych)")
     print(
         f"Grupa KMeans z największą sumaryczną wartością zwrotów: {max_kmeans_cluster} ({kmeans_returns[max_kmeans_cluster]} jednostek zwróconych)")
+
+
+def assign_rfm_score(series, reversed=False):
+    labels = [0, 1, 2, 3, 4, 5]
+    if reversed:
+        labels = labels[::-1]
+        
+    return pd.cut(series,
+                  bins=[-np.inf, series.quantile(0.166), series.quantile(0.333), series.quantile(0.5),
+                        series.quantile(0.666), series.quantile(0.833), np.inf],
+                  labels=labels)
+
 
 def new_df_for_rfm(df):
     df['InvoiceDate'] = pd.to_datetime(df['InvoiceDate'])
@@ -166,3 +186,11 @@ def new_df_for_rfm(df):
     })
 
     rfm.to_csv("rfm.csv")
+
+    rfm['R_score'] = assign_rfm_score(rfm['recency'])
+
+    rfm['F_score'] = assign_rfm_score(rfm['frequency'])
+
+    rfm['M_score'] = assign_rfm_score(rfm['monetary'])
+
+    rfm['RFM_score'] = rfm['R_score'].astype(int) + rfm['F_score'].astype(int) + rfm['M_score'].astype(int)
