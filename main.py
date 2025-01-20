@@ -18,4 +18,6 @@ df = tsne(df)
 
 group_with_the_biggest_amount_of_returns(df)
 
-new_df_for_rfm(basic_df)
+df = new_df_for_rfm(basic_df)
+
+random_forest_rfm(df)

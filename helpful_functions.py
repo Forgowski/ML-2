@@ -3,9 +3,13 @@ import pandas as pd
 from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.decomposition import PCA
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.manifold import TSNE
+from sklearn.metrics import confusion_matrix, classification_report, accuracy_score
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import seaborn as sns
+from sklearn.preprocessing import LabelEncoder
 
 
 def load_data(path):
@@ -206,4 +210,28 @@ def new_df_for_rfm(df):
 
     rfm.to_csv("rfm.csv")
 
+    return rfm
 
+def random_forest_rfm(df):
+    X = df[['R_score', 'F_score', 'M_score']]
+    y = df['Segment']
+
+
+    le = LabelEncoder()
+    y = le.fit_transform(y)
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+    rf_model = RandomForestClassifier(n_estimators=50, random_state=42)
+
+    rf_model.fit(X_train, y_train)
+
+    y_pred = rf_model.predict(X_test)
+
+    print("\nClassification Report:\n", classification_report(y_test, y_pred))
+    print("\nAccuracy Score:", accuracy_score(y_test, y_pred))
+
+    # new_customer = pd.DataFrame({'R_score': [2], 'F_score': [5], 'M_score': [3]})
+    #
+    # predicted_segment = rf_model.predict(new_customer)
+    # print("Predicted Segment:", le.inverse_transform(predicted_segment))
